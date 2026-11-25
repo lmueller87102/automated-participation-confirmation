@@ -187,7 +187,7 @@
             setRegularFont(HEADER_FONT_SIZE_PT);
             doc.setTextColor(71, 85, 105);
             doc.text(model.affiliationLines, MARGIN_LEFT_MM, 12.5);
-            doc.text("Page " + pageNumber + "/" + totalPages, PAGE_WIDTH_MM - MARGIN_RIGHT_MM, 12.5, { align: "right" });
+            doc.text((model.pageLabel || "Page") + " " + pageNumber + "/" + totalPages, PAGE_WIDTH_MM - MARGIN_RIGHT_MM, 12.5, { align: "right" });
             currentY = 28;
         }
 
@@ -198,7 +198,7 @@
 
             renderHeader(index + 1);
 
-            addWrappedText("Confirmation of Participation", {
+            addWrappedText(model.title || "Confirmation of Participation", {
                 medium: true,
                 fontSizePt: TITLE_FONT_SIZE_PT,
                 marginBottomMm: 6
