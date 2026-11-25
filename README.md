@@ -1,6 +1,6 @@
 # Automated Confirmation of User Study Participation
 
-This repository contains the browser-based Participation Confirmation Generator of the HCI User Studies Toolkit. It helps research teams generate confirmation letters for one or many study participants locally in the browser, including PDF preview, batch export, and print support.
+This repository contains the browser-based Participation Confirmation Generator of the HCI User Studies Toolkit. It helps research teams generate confirmation letters in English or German for one or many study participants locally in the browser, including PDF preview, batch export, and print support.
 
 Live tool:
 <a href="https://hci-studies.org/participation-confirmation-generator/">https://hci-studies.org/participation-confirmation-generator/</a>

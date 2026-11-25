@@ -43,6 +43,11 @@
                 label: "University of Stuttgart",
                 value: "stuttgart",
                 affiliation: "University of Stuttgart, Pfaffenwaldring 5a, 70569 Stuttgart, Germany"
+            },
+            {
+                label: "Hochschule für Technik und Wirtschaft Dresden",
+                value: "htwd",
+                affiliation: "Hochschule für Technik und Wirtschaft, Friedrich-List-Platz 1, 01069 Dresden, Germany"
             }
         ],
         researchTypes: [
@@ -173,7 +178,7 @@
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
     }
 
-    function joinNames(values) {
+    function joinNames(values, language) {
         if (values.length === 0) {
             return "";
         }
@@ -183,15 +188,45 @@
         }
 
         if (values.length === 2) {
-            return values[0] + " and " + values[1];
+            return values[0] + (language === "de" ? " und " : " and ") + values[1];
         }
 
-        return values.slice(0, -1).join(", ") + ", and " + values[values.length - 1];
+        return values.slice(0, -1).join(", ") + (language === "de" ? " und " : ", and ") + values[values.length - 1];
     }
 
-    function formatDateRange() {
+    function formatDateRange(language) {
         var picker = $("#daterangepicker").data("daterangepicker");
+
+        if (language === "de") {
+            return "vom " + picker.startDate.format("DD.MM.YYYY") + " bis zum " + picker.endDate.format("DD.MM.YYYY");
+        }
+
         return "from " + picker.startDate.format("DD/MM/YYYY") + " to " + picker.endDate.format("DD/MM/YYYY");
+    }
+
+    function getGermanResearchType(researchType) {
+        var translations = {
+            "online study": { label: "Online-Studie", ownership: "unserer", singularOwnership: "meiner" },
+            "user study": { label: "Nutzerstudie", ownership: "unserer", singularOwnership: "meiner" },
+            "field study": { label: "Feldstudie", ownership: "unserer", singularOwnership: "meiner" },
+            interview: { label: "Interview", ownership: "unserem", singularOwnership: "meinem" }
+        };
+
+        return translations[researchType] || {
+            label: researchType,
+            ownership: "unserer",
+            singularOwnership: "meiner"
+        };
+    }
+
+    function getGermanCompensation(compensation) {
+        var translations = {
+            "no compensation": "keine Vergütung",
+            "one half credit point for the lecture MMI (Mensch-Maschine-Interaktion), HMI (Human-Machine-Interaction), or HCI (Human-Computer-Interaction)": "einen halben Leistungspunkt für die Lehrveranstaltung MMI (Mensch-Maschine-Interaktion), HMI (Human-Machine-Interaction) oder HCI (Human-Computer-Interaction)",
+            "one credit point for the lecture MMI (Mensch-Maschine-Interaktion), HMI (Human-Machine-Interaction), or HCI (Human-Computer-Interaction)": "einen Leistungspunkt für die Lehrveranstaltung MMI (Mensch-Maschine-Interaktion), HMI (Human-Machine-Interaction) oder HCI (Human-Computer-Interaction)"
+        };
+
+        return translations[compensation] || compensation;
     }
 
     function normalizeParticipants(value) {
@@ -237,10 +272,11 @@
 
         return {
             institution: institution,
+            language: $("#pdfLanguage").val(),
             researchType: $("#selectResearch").val(),
             title: $("#title").val().trim(),
             compensation: $("#compensation").val(),
-            dateRange: formatDateRange(),
+            dateRange: formatDateRange($("#pdfLanguage").val()),
             duration: $("#duration").val().trim(),
             teamMembers: normalizeCommaSeparated($("#teamMembers").val()),
             teamMemberEmails: normalizeCommaSeparated($("#teamMembersMails").val()),
@@ -305,13 +341,22 @@
     }
 
     function createModel(data) {
+        var isGerman = data.language === "de";
         var teamLabel = data.teamMembers.length > 1 ? "we" : "I";
         var ownershipLabel = data.teamMembers.length > 1 ? "our" : "my";
         var contactLabel = data.teamMembers.length > 1 ? "us" : "me";
         var thanksLabel = data.teamMembers.length > 1 ? "We are" : "I am";
+        var germanResearchType = getGermanResearchType(data.researchType);
+        var translatedResearchType = isGerman ? germanResearchType.label : data.researchType;
+        var translatedOwnershipLabel = isGerman
+            ? (data.teamMembers.length > 1 ? germanResearchType.ownership : germanResearchType.singularOwnership)
+            : ownershipLabel;
+        var translatedCompensation = isGerman ? getGermanCompensation(data.compensation) : data.compensation;
 
         return {
             fileName: "Confirmation of Participation.pdf",
+            title: isGerman ? "Teilnahmebestätigung" : "Confirmation of Participation",
+            pageLabel: isGerman ? "Seite" : "Page",
             affiliationLines: data.institution.affiliation,
             participants: data.participants.map(function(participant) {
                 return {
@@ -320,19 +365,35 @@
                     isBlank: participant.isBlank,
                     hasSignature: data.hasSignature,
                     signatureDataUrl: data.signatureDataUrl,
-                    signatureLabel: data.teamMembers.length > 1 ? "Signatures of the experimenters" : "Signature of the experimenter"
+                    signatureLabel: isGerman
+                        ? (data.teamMembers.length > 1 ? "Unterschriften des Versuchsteams" : "Unterschrift der Versuchsleitung")
+                        : (data.teamMembers.length > 1 ? "Signatures of the experimenters" : "Signature of the experimenter")
                 };
             }),
-            openingLine: "With this letter " + teamLabel + ", " + joinNames(data.teamMembers) + ", hereby confirm that",
-            participationLine: "participated in " + ownershipLabel + " " + data.researchType + " \"" + data.title + "\". The " + data.researchType + " occurred in the period " + data.dateRange + " and lasted around " + data.duration + ". The research is supervised by " + data.supervisorName + " (" + data.supervisorMail + ") at " + data.institution.label + ".",
-            compensationLine: "The participation is rewarded with " + data.compensation + ".",
-            rulesLine: "Repeated participation in the study is not permitted. Subsequent changes of the compensation are not allowed. The regulations of participation of the informed consent apply.",
-            supervisorLine: "The supervisor and head of the investigation, " + data.supervisorName + " (" + data.supervisorMail + "), is available to answer questions regarding the process and scope of this research.",
-            contactIntroLine: "In case of any questions regarding the details of the " + data.researchType + ", you can contact " + contactLabel + ":",
+            openingLine: isGerman
+                ? (data.teamMembers.length > 1 ? "Hiermit bestätigen wir, " : "Hiermit bestätige ich, ") + joinNames(data.teamMembers, "de") + ", dass"
+                : "With this letter " + teamLabel + ", " + joinNames(data.teamMembers) + ", hereby confirm that",
+            participationLine: isGerman
+                ? "an " + translatedOwnershipLabel + " " + translatedResearchType + " „" + data.title + "“ teilgenommen hat. Die " + translatedResearchType + " fand im Zeitraum " + data.dateRange + " statt und dauerte etwa " + data.duration + ". Die Studie wird von " + data.supervisorName + " (" + data.supervisorMail + ") betreut."
+                : "participated in " + ownershipLabel + " " + data.researchType + " \"" + data.title + "\". The " + data.researchType + " occurred in the period " + data.dateRange + " and lasted around " + data.duration + ". The research is supervised by " + data.supervisorName + " (" + data.supervisorMail + ") at " + data.institution.label + ".",
+            compensationLine: isGerman
+                ? (data.compensation === "no compensation" ? "Die Teilnahme wird nicht vergütet." : "Die Teilnahme wird mit " + translatedCompensation + " vergütet.")
+                : "The participation is rewarded with " + data.compensation + ".",
+            rulesLine: isGerman
+                ? "Eine mehrmalige Teilnahme an der Studie ist nicht gestattet. Eine nachträgliche Änderung der Vergütung ist ausgeschlossen. Es gelten die Teilnahmebedingungen der Einverständniserklärung."
+                : "Repeated participation in the study is not permitted. Subsequent changes of the compensation are not allowed. The regulations of participation of the informed consent apply.",
+            supervisorLine: isGerman
+                ? "Die betreuende Person und Versuchsleitung, " + data.supervisorName + " (" + data.supervisorMail + "), steht für Fragen zum Ablauf und Umfang dieser Studie zur Verfügung."
+                : "The supervisor and head of the investigation, " + data.supervisorName + " (" + data.supervisorMail + "), is available to answer questions regarding the process and scope of this research.",
+            contactIntroLine: isGerman
+                ? "Bei Fragen zu Einzelheiten der Studie können Sie sich an folgende Personen wenden:"
+                : "In case of any questions regarding the details of the " + data.researchType + ", you can contact " + contactLabel + ":",
             contactLines: data.teamMembers.map(function(name, index) {
                 return name + " (" + data.teamMemberEmails[index] + ")";
             }),
-            thanksLine: thanksLabel + " thankful for your support of " + ownershipLabel + " research."
+            thanksLine: isGerman
+                ? (data.teamMembers.length > 1 ? "Wir danken Ihnen für Ihre Unterstützung unserer Forschung." : "Ich danke Ihnen für Ihre Unterstützung meiner Forschung.")
+                : thanksLabel + " thankful for your support of " + ownershipLabel + " research."
         };
     }
 
@@ -344,7 +405,7 @@
                 '<div class="letter-affiliation">' + escapeHtml(model.affiliationLines) + '</div>',
                 '<img class="letter-logo" src="_img/hdmlogo.png" alt="HdM logo" />',
                 '</div>',
-                '<h2 class="letter-title">Confirmation of Participation</h2>',
+                '<h2 class="letter-title">' + escapeHtml(model.title) + '</h2>',
                 '<p>' + escapeHtml(model.openingLine) + '</p>',
                 '<div class="participant-name' + (participant.isBlank ? ' is-blank' : '') + '">' + escapeHtml(participant.displayName) + '</div>',
                 '<p>' + escapeHtml(model.participationLine) + '</p>',
@@ -393,6 +454,8 @@
     function buildSingleParticipantModel(baseModel, participant) {
         return {
             fileName: "Confirmation of Participation - " + participant.fileNameSuffix + ".pdf",
+            title: baseModel.title,
+            pageLabel: baseModel.pageLabel,
             affiliationLines: baseModel.affiliationLines,
             participants: [participant],
             openingLine: baseModel.openingLine,
@@ -439,7 +502,6 @@
     }
 
     function applyExample(includeSignature) {
-        $("#selectInstitution").val("hdm");
         $("#selectResearch").val("user study");
         $("#title").val("Fitts' Task in Virtual Reality using Avatar Hands");
         $("#compensation").val("one credit point for the lecture MMI (Mensch-Maschine-Interaktion), HMI (Human-Machine-Interaction), or HCI (Human-Computer-Interaction)");
